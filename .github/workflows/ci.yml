@@ -19,6 +19,8 @@ jobs:
 
       - name: Run Docker container
         run: docker run -d -p 80:3000 liatrio-apprentice-app
+      - name: Verify application is ready
+        run: curl --fail --retry 10 --retry-delay 1 http://localhost/
 
       - name: Run Liatrio verification
         uses: liatrio/github-actions/apprentice-action@master
