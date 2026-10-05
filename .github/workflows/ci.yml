@@ -17,3 +17,8 @@ jobs:
       - name: Build Docker image
         run: docker build -t liatrio-apprentice-app .
 
+      - name: Run Docker container
+        run: docker run -d -p 80:3000 liatrio-apprentice-app
+
+      - name: Run Liatrio verification
+        uses: liatrio/github-actions/apprentice-action@master
