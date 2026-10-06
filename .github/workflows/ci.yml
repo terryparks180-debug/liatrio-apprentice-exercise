@@ -31,3 +31,8 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Tag Docker image
+        run: docker tag liatrio-apprentice-app tpgotmotion/liatrio-apprentice-app:${{ github.run_number }}
+
+      - name: Push Docker image
+        run: docker push tpgotmotion/liatrio-apprentice-app:${{ github.run_number }}
