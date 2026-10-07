@@ -23,7 +23,6 @@ jobs:
         run: curl --fail --retry 10 --retry-delay 1 http://localhost/
 
       - name: Run Liatrio verification
-        continue-on-error: true
         uses: liatrio/github-actions/apprentice-action@master
 
       - name: Log in to Docker Hub
