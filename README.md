@@ -123,6 +123,3 @@ This experience reinforced the importance of understanding failures rather than 
 
 - Automate deployment to Cloud Run after successful verification and image publishing.
 - Add another JSON field and verify that the updated application deploys successfully.
-- Improve automated test coverage, including a minified-JSON test.
-- Strengthen image versioning and dependency pinning.
-- Add monitoring and deployment rollback
