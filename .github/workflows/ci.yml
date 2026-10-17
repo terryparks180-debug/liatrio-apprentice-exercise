@@ -26,6 +26,24 @@ jobs:
       - name: Verify application is ready
         run: curl --fail --retry 10 --retry-delay 1 http://localhost/
 
+      - name: Verify minified JSON
+        shell: bash
+        run: |
+          curl --fail --silent --show-error http://localhost/ | python3 -c '
+          import json
+          import sys
+
+          raw = sys.stdin.buffer.read()
+          data = json.loads(raw)
+          compact = json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+          if raw != compact:
+              print("FAIL: JSON response is not minified")
+              sys.exit(1)
+
+          print("PASS: JSON response is valid and minified")
+          '
+
       - name: Run Liatrio verification
         uses: liatrio/github-actions/apprentice-action@0b41561cca6822cc8d880fe0e49e7807a41fdf91
 
