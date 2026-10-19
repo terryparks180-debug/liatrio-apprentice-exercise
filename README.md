@@ -1,23 +1,26 @@
 # Liatrio Apprenticeship Interview Exercise
 
-A Go + Fiber API containerized with Docker, verified and published through GitHub Actions, and deployed to Google Cloud Run.
+A Go + Fiber web application containerized with Docker, automatically verified and published through GitHub Actions, and deployed to Google Cloud Run using a CI/CD pipeline.
 
 ## Overview
 
 This repository contains my work for the Liatrio Apprenticeship Interview Exercise.
 
-The goal of the project was to build a simple web application and take it through the process of containerization, automated verification, image publishing, and cloud deployment.
+The goal of this project was to build a simple web application and take it through containerization, automated verification, image publishing, and cloud deployment.
 
-The application exposes a single HTTP GET endpoint that returns my name and a dynamically generated timestamp as minified JSON.
+I divided the exercise into five sprints so I could focus on one part at a time, verify my progress, and improve my work based on feedback.
+
+I also extended the project by implementing automated deployment to Google Cloud Run and adding my own minified JSON verification step.
 
 ## Tech Stack
 
-- Go
-- Fiber
-- Docker
-- GitHub Actions
-- Docker Hub
-- Google Cloud Run
+- **Go:** Application programming language
+- **Fiber:** Web framework for handling HTTP requests
+- **Docker:** Application containerization
+- **GitHub Actions:** CI/CD automation
+- **Docker Hub:** Container image registry
+- **Google Cloud Run:** Cloud hosting and deployment
+- **Python:** Automated minified JSON verification
 
 ## Application
 
@@ -25,23 +28,40 @@ The application exposes one HTTP endpoint:
 
 `GET /`
 
-Example response:
+Example JSON response:
 
-`{"message":"My name is Terry","timestamp":1791413589822}`
+`{"message":"My name is Terry","timestamp":1791413589822,"version 2":"demo 2"}`
 
-The timestamp is generated for every request using `time.Now().UnixMilli()`.
+The version field is used to demonstrate application changes and may vary between deployments.
+
+The timestamp is dynamically generated using `time.Now().UnixMilli()`, which returns the current Unix timestamp in milliseconds.
+
+The JSON response is returned using Fiber's `c.JSON()` function.
 
 The application listens on port `3000`.
 
 ## Docker Containerization
 
-The application uses a multi-stage Dockerfile.
+I chose to use a multi-stage Dockerfile to separate the build environment from the runtime environment.
 
-The first stage uses Go to download dependencies and compile the application.
+**Stage 1 — Build**
 
-The second stage uses Alpine Linux and copies the compiled application into the final image.
+The first stage uses the Go environment to:
 
-This separates the build environment from the runtime environment.
+- Download application dependencies.
+- Copy the Go source code.
+- Compile the application into an executable.
+
+**Stage 2 — Runtime**
+
+The second stage uses a lightweight Alpine Linux image to:
+
+- Copy the compiled executable from the builder stage.
+- Set the application's working directory.
+- Expose port `3000`.
+- Start the compiled application using `CMD`.
+
+This approach keeps the final image smaller because the Go compiler and other development tools are not needed in the runtime image.
 
 ### Running Locally
 
@@ -57,69 +77,175 @@ Test the application:
 
 `curl http://localhost:8080/`
 
-## GitHub Actions
+## GitHub Actions — CI/CD Pipeline
 
-The GitHub Actions workflow is located at `.github/workflows/ci.yml`.
+My automated workflow is located at:
+
+`.github/workflows/ci.yml`
 
 The workflow runs on pushes to `main` and on pull requests.
 
-It performs the following steps:
+It contains two main jobs: **build** and **deploy**.
 
-1. Checks out the repository.
+### Build and Verification Job
+
+The build job:
+
+1. Checks out the GitHub repository.
 2. Builds the Docker image.
 3. Starts the application in a Docker container.
-4. Checks that the application responds using `curl`.
-5. Runs Liatrio's apprentice-action verification.
-6. Authenticates with Docker Hub using GitHub Secrets.
-7. Tags the image using the GitHub Actions run number.
-8. Pushes the versioned image to Docker Hub.
+4. Uses `curl` to verify that the application responds.
+5. Runs my custom minified JSON verification.
+6. Runs Liatrio's apprentice-action verification.
+7. Authenticates with Docker Hub using GitHub Secrets.
+8. Tags the image using the GitHub Actions run number.
+9. Pushes the versioned image to Docker Hub.
 
-The verification step must succeed before the image can be published.
+Docker Hub publishing occurs on successful pushes to `main`, not during pull-request builds.
 
-The Liatrio action is pinned to a specific commit SHA. The selected version runs six verification checks. The unfinished minified-JSON test on the newer master branch is not included in this version, so JSON formatting was also checked separately.
+Verification must succeed before the image can be published.
+
+### Liatrio Verification Troubleshooting
+
+One of my biggest challenges was troubleshooting Liatrio's apprentice-action.
+
+The newer master version contained an unfinished minified JSON test that caused verification errors.
+
+Initially, I used `continue-on-error` to investigate whether the remaining publishing steps worked. However, I learned that this weakened the pipeline because it allowed publishing to continue even when verification failed.
+
+After receiving feedback, I investigated the action's source code and commit history.
+
+I decided to pin the action to an earlier working commit:
+
+`0b41561cca6822cc8d880fe0e49e7807a41fdf91`
+
+That version successfully runs six verification checks.
+
+However, the earlier version does not include the newer minified JSON test.
+
+### Additional Minified JSON Verification
+
+Because the exercise explicitly requires minified JSON, I added my own automated verification step to GitHub Actions.
+
+The verification uses `curl` and Python to:
+
+1. Request the JSON response from my running application.
+2. Parse the response to confirm it is valid JSON.
+3. Generate a compact JSON representation without unnecessary whitespace.
+4. Compare the compact representation against the original response.
+5. Fail the verification if the responses do not match.
+
+This check uses Python's compact JSON serialization as the expected format.
+
+The verification runs before the Liatrio action and before image publishing.
+
+**Testing performed:**
+
+- Confirmed that the automated verification passed in GitHub Actions.
+- Tested the Python comparison logic locally using compact JSON.
+- Tested the logic using JSON containing unnecessary whitespace.
+- Confirmed that the compact example passed and the non-minified example was rejected.
+
+The local negative test checked the verification logic independently; it was not a full failed CI/CD run.
+
+This additional test helps maintain verification coverage without relying on the unfinished test in the newer Liatrio action.
 
 ## Docker Hub
 
-The published images are stored at:
+My published Docker images are stored at:
 
-`tpgotmotion/liatrio-apprentice-app`
+https://hub.docker.com/r/tpgotmotion/liatrio-apprentice-app
 
-The workflow uses the GitHub Actions run number as the image tag.
+The workflow uniquely tags each published image using its GitHub Actions run number.
 
-The image deployed to Google Cloud Run is:
+Image format:
 
-`tpgotmotion/liatrio-apprentice-app:13`
+`tpgotmotion/liatrio-apprentice-app:<run_number>`
 
-## Cloud Deployment
+This allows each successful publishing run to produce an identifiable image version.
+
+## Automated Google Cloud Run Deployment
 
 The application is deployed to Google Cloud Run.
+
+**Cloud Run configuration:**
 
 - Service: `liatrio-apprentice-app`
 - Region: `us-west1`
 - Container port: `3000`
-- Deployed image: `tpgotmotion/liatrio-apprentice-app:13`
+- Image registry: Docker Hub
 
-Public endpoint:
+**Public endpoint:**
 
 https://liatrio-apprentice-app-1042979448670.us-west1.run.app/
 
-The endpoint was tested successfully in both a web browser and the terminal using `curl`.
+### Continuous Deployment
 
-The deployment to Cloud Run was performed manually. The build, verification, and image publishing steps are automated.
+I initially deployed the application to Google Cloud Run manually.
+
+After completing that process, I extended the project by adding an automated deployment job to GitHub Actions.
+
+The deployment job uses `needs: build`, meaning the build job must succeed before deployment can begin.
+
+When a push to `main` successfully completes the build and verification steps, the workflow:
+
+1. Publishes the uniquely tagged Docker image to Docker Hub.
+2. Authenticates with Google Cloud.
+3. Deploys the versioned Docker Hub image to Cloud Run.
+4. Uses `curl` to verify that the deployed application responds successfully.
+
+I tested the end-to-end process by updating the application, pushing the changes to GitHub, and confirming that the changes appeared at the public Cloud Run URL.
+
+### Workload Identity Federation
+
+To allow GitHub Actions to deploy securely to Google Cloud, I configured Workload Identity Federation.
+
+This allows GitHub Actions to authenticate with Google Cloud using short-lived credentials instead of storing a long-lived Google Cloud service account private key.
+
+The deployment workflow uses a Google Cloud service account with the permissions required to deploy the application.
+
+This helped me understand how authentication and permissions are used in automated cloud deployments.
 
 ## Challenges and Lessons Learned
 
-One of the main challenges was troubleshooting the Liatrio apprentice-action verification step.
+### Troubleshooting Verification Failures
 
-The action's master branch contained an unfinished test that prevented the workflow from passing.
+One of the biggest lessons I learned was the importance of investigating failures rather than bypassing them.
 
-I initially used `continue-on-error` to test the publishing steps, but learned that this weakened the verification gate because publishing could proceed despite a failed check.
+My experience with `continue-on-error` helped me understand why verification needs to remain a required part of the CI/CD pipeline.
 
-I removed that workaround, investigated the action's commit history, and pinned the dependency to an earlier working version using its full commit SHA.
+### Understanding Docker
 
-This experience reinforced the importance of understanding failures rather than bypassing verification.
+Using a multi-stage Dockerfile helped me understand the difference between building an application and running a compiled executable inside a container.
+
+I also learned how separating build and runtime environments can reduce unnecessary image contents.
+
+### CI/CD Automation
+
+I gained hands-on experience connecting multiple tools into a working automated pipeline.
+
+Instead of manually repeating the build, verification, publishing, and deployment processes, GitHub Actions now handles those steps after a successful push to `main`.
+
+### Communication and Feedback
+
+I worked through the exercise in smaller stages while researching unfamiliar technologies, troubleshooting problems, and applying feedback.
+
+This helped me become more comfortable investigating issues, communicating my progress, and improving my work.
 
 ## Future Improvements
 
-- Automate deployment to Cloud Run after successful verification and image publishing.
-- Add another JSON field and verify that the updated application deploys successfully.
+If I had more time, I would consider:
+
+- Documenting and testing a rollback procedure using Cloud Run revisions.
+- Implementing monitoring and alerts for application availability.
+- Further improving deployment reliability and security.
+
+## Final Outcome
+
+This project demonstrates an end-to-end CI/CD process.
+
+I built a Go web application, containerized it with Docker, implemented automated verification, published versioned images to Docker Hub, and configured automatic deployment to Google Cloud Run.
+
+I also added an independent minified JSON verification step to cover a requirement not checked by the pinned version of Liatrio's apprentice-action.
+
+The most valuable part of this exercise was learning how to investigate failures, understand the tools I'm using, and improve a working system through testing and feedback.
